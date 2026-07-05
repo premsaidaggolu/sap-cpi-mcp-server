@@ -1,0 +1,23 @@
+{
+  "xsappname": "sap-cpi-mcp",
+  "tenant-mode": "dedicated",
+  "description": "OAuth security for the SAP CPI MCP server",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Use",
+      "description": "Permission to call the SAP CPI MCP server"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "CpiMcpUser",
+      "description": "Can call the SAP CPI MCP server",
+      "scope-references": ["$XSAPPNAME.Use"]
+    }
+  ],
+  "oauth2-configuration": {
+    "token-validity": 3600,
+    "credential-types": ["binding-secret"],
+    "redirect-uris": ["https://*.claude.ai/**", "https://claude.ai/**"]
+  }
+}

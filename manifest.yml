@@ -1,0 +1,21 @@
+---
+applications:
+  - name: sap-cpi-mcp-server
+    memory: 256M
+    disk_quota: 512M
+    instances: 1
+    buildpacks:
+      - nodejs_buildpack
+    command: node src/index.js
+    env:
+      MCP_TRANSPORT: http
+      # --- Set these to your CPI service-key values (or use `cf set-env`) ---
+      # CPI_BASE_URL: https://<tenant>.it-cpiXXX.cfapps.<region>.hana.ondemand.com/api/v1
+      # CPI_TOKEN_URL: https://<subdomain>.authentication.<region>.hana.ondemand.com/oauth/token
+      # CPI_CLIENT_ID: <clientid-from-service-key>
+      # CPI_CLIENT_SECRET: <clientsecret-from-service-key>
+      # Optional: protect the /mcp endpoint with a shared bearer token.
+      # MCP_AUTH_TOKEN: <a-long-random-secret>
+    # Prefer binding a user-provided service instead of plain env for secrets:
+    # services:
+    #   - cpi-credentials

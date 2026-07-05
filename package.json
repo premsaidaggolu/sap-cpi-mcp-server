@@ -1,0 +1,21 @@
+{
+  "name": "sap-cpi-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for monitoring SAP Cloud Integration (CPI) via OData APIs — Message Processing Logs (MPL) and design-time artifacts.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "start:http": "MCP_TRANSPORT=http node src/index.js",
+    "start:stdio": "MCP_TRANSPORT=stdio node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^4.19.2",
+    "jose": "^5.9.6",
+    "zod": "^3.23.8"
+  }
+}
