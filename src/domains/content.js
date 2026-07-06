@@ -182,4 +182,76 @@ export function registerContentTools(server) {
       )
     )
   );
+
+  // --- Create integration flow -------------------------------------------
+  server.registerTool(
+    "create_integration_flow",
+    {
+      title: "Create Integration Flow",
+      description:
+        "Create a new (empty) integration flow in a package — a default flow at version 1.0.0 that " +
+        "you then edit in the Integration Suite web editor. Requires ALLOW_WRITE.",
+      inputSchema: {
+        packageId: z.string(),
+        id: z.string().describe("Technical Id (no spaces)."),
+        name: z.string(),
+        description: z.string().optional(),
+        confirm: z.boolean().optional().describe("Must be true to proceed."),
+      },
+    },
+    writeHandler(
+      ({ packageId, id, name, description }) =>
+        cpiRequest("POST", "/IntegrationDesigntimeArtifacts", {
+          body: { Name: name, Id: id, PackageId: packageId, Description: description || "" },
+        }),
+      { action: ({ id, packageId }) => `create integration flow '${id}' in package '${packageId}'` }
+    )
+  );
+
+  // --- Save integration flow as a version --------------------------------
+  server.registerTool(
+    "save_integration_flow_as_version",
+    {
+      title: "Save Integration Flow as Version",
+      description:
+        "Save the current draft ('active') of an integration flow as a new version, with an optional " +
+        "version comment. Requires ALLOW_WRITE. (The comment is applied to the artifact before the " +
+        "version is saved, since the SaveAsVersion API doesn't take one directly.)",
+      inputSchema: {
+        artifactId: z.string(),
+        version: z.string().describe("New version to save, e.g. '1.0.1'."),
+        comment: z.string().optional().describe("Version comment / note."),
+        confirm: z.boolean().optional().describe("Must be true to proceed."),
+      },
+    },
+    writeHandler(
+      async ({ artifactId, version, comment }) => {
+        let commentApplied = false;
+        let commentNote = null;
+        if (comment) {
+          // Setting the comment requires a PUT that includes the artifact Name, so fetch it first.
+          // Best-effort: never let the comment step block the version save.
+          try {
+            const art = await cpiGet(
+              `/IntegrationDesigntimeArtifacts(Id=${odataString(artifactId)},Version=${odataString("active")})`
+            );
+            await cpiRequest(
+              "PUT",
+              `/IntegrationDesigntimeArtifacts(Id=${odataString(artifactId)},Version=${odataString("active")})`,
+              { body: { Name: art.Name, Comment: comment } }
+            );
+            commentApplied = true;
+          } catch (e) {
+            commentNote = `Comment could not be applied (${e.message}); version was still saved.`;
+          }
+        }
+        const result = await cpiInvoke("IntegrationDesigntimeArtifactSaveAsVersion", {
+          Id: artifactId,
+          SaveAsVersion: version,
+        });
+        return { artifactId, savedVersion: version, comment: comment || null, commentApplied, commentNote, result };
+      },
+      { action: ({ artifactId, version }) => `save flow '${artifactId}' as version ${version}` }
+    )
+  );
 }

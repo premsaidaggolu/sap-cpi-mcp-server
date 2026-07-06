@@ -203,7 +203,7 @@ give your admin the endpoint URL and the OAuth client details from the service k
 ## Tool overview
 
 **Monitoring (8):** search/get MPLs, error info, headers, run steps, message store, failure summary, cancel.
-**Content (11):** package & flow CRUD, copy, download, configurations, resources.
+**Content (13):** package & flow CRUD, create flow, save-as-version, copy, download, configurations, resources.
 **Runtime (6):** deployed list/status, deploy, undeploy, build status, endpoints.
 **Admin (12):** user/OAuth credentials, keystore, number ranges, data stores, variables, queues, partners, logs.
 **Generic (5):** `cpi_api_catalog`, `cpi_query`, `cpi_get_entity`, `cpi_invoke_function`, `cpi_write` — reach the whole API.

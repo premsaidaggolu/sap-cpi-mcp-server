@@ -7,7 +7,7 @@ package on the SAP Business Accelerator Hub.
 
 It runs locally over **stdio** or as an HTTP service you can deploy to **SAP BTP Cloud Foundry**.
 
-**42 tools**: curated tools for the common workflows, plus generic escape-hatch tools
+**44 tools**: curated tools for the common workflows, plus generic escape-hatch tools
 (`cpi_query`, `cpi_get_entity`, `cpi_invoke_function`, `cpi_write`) that reach **any** of the
 ~130 entity sets and 35 operations the API exposes.
 
@@ -34,6 +34,8 @@ It runs locally over **stdio** or as an HTTP service you can deploy to **SAP BTP
 | `create_integration_package` ⚠️ / `delete_integration_package` ⚠️ | Package CRUD |
 | `copy_integration_package` ⚠️ | Copy a standard/Discover package into the workspace |
 | `list_integration_flows` / `get_integration_flow` | Integration flows |
+| `create_integration_flow` ⚠️ | Create a new (empty) iFlow in a package |
+| `save_integration_flow_as_version` ⚠️ | Save the flow draft as a new version (+ optional comment) |
 | `download_integration_flow` | Download flow as base64 zip |
 | `get_flow_configurations` / `update_flow_configuration` ⚠️ | Externalized parameters |
 | `get_flow_resources` | Scripts/XSDs/WSDLs inside a flow |
