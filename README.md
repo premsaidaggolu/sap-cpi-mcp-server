@@ -7,7 +7,7 @@ package on the SAP Business Accelerator Hub.
 
 It runs locally over **stdio** or as an HTTP service you can deploy to **SAP BTP Cloud Foundry**.
 
-**44 tools**: curated tools for the common workflows, plus generic escape-hatch tools
+**45 tools**: curated tools for the common workflows, plus generic escape-hatch tools
 (`cpi_query`, `cpi_get_entity`, `cpi_invoke_function`, `cpi_write`) that reach **any** of the
 ~130 entity sets and 35 operations the API exposes.
 
@@ -39,6 +39,7 @@ It runs locally over **stdio** or as an HTTP service you can deploy to **SAP BTP
 | `download_integration_flow` | Download flow as base64 zip |
 | `get_flow_configurations` / `update_flow_configuration` ⚠️ | Externalized parameters |
 | `get_flow_resources` | Scripts/XSDs/WSDLs inside a flow |
+| `where_used` | Search a word/string (e.g. a credential name, endpoint, or value) across flow content — process XML, adapter properties, scripts, mappings, parameter files — one package, one flow, or the whole tenant |
 
 ### Runtime & deployment
 | Tool | Purpose |
@@ -110,6 +111,26 @@ For the hosted (Cloud Foundry) endpoint, authentication is handled by `src/auth.
 
 Auth mode is auto-detected: XSUAA binding → OAuth; else `MCP_AUTH_TOKEN` → static; else open.
 The **local stdio** transport is unaffected by all of this.
+
+### OAuth discovery / authorize / token proxy (remote MCP clients)
+
+Remote MCP OAuth clients (e.g. a Claude custom connector) resolve the authorization server
+either via [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) discovery at this origin, or —
+if that's absent — by assuming `/authorize` and `/token` live on the MCP server's own host.
+XSUAA's real endpoints live on a different host (the UAA tenant), so without help the client
+gets a 404 hitting `<this-origin>/authorize` directly.
+
+When an XSUAA binding is present, the server exposes:
+
+| Route | Purpose |
+|-------|---------|
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata pointing at the real XSUAA `authorization_endpoint` / `token_endpoint` |
+| `GET /authorize` | Redirects to the real XSUAA `/oauth/authorize`, forwarding all query params (`client_id`, `redirect_uri`, `code_challenge`, `state`, ...) as-is |
+| `POST /token` | Proxies the code/token exchange to the real XSUAA `/oauth/token` and relays its response verbatim |
+
+If no XSUAA binding is found, these routes are not mounted and a warning is logged at startup.
+This is purely a discovery/proxy convenience for OAuth clients — it does not replace the JWT
+verification in `authMiddleware()`, which still gates every request to `/mcp`.
 
 ---
 
