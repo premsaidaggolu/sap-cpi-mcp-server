@@ -167,12 +167,13 @@ export function registerGenericTools(server) {
       title: "CPI Write (create/update/delete any entity)",
       description:
         "Low-level create/update/delete against any CPI OData path. Requires ALLOW_WRITE. " +
-        "DELETE requires confirm=true. Provide 'path' relative to /api/v1 (e.g. \"/IntegrationPackages('X')\").",
+        "Every call (POST/PUT/DELETE/MERGE) requires confirm=true. Provide 'path' relative to " +
+        "/api/v1 (e.g. \"/IntegrationPackages('X')\").",
       inputSchema: {
         method: z.enum(["POST", "PUT", "DELETE", "MERGE"]),
         path: z.string().describe("Path relative to /api/v1, e.g. /NumberRanges or /Variables(...)."),
         body: z.record(z.any()).optional().describe("Request body object (for POST/PUT/MERGE)."),
-        confirm: z.boolean().optional().describe("Required true for DELETE."),
+        confirm: z.boolean().optional().describe("Required true for every call, not just DELETE."),
       },
     },
     writeHandler(({ method, path, body }) => cpiRequest(method, path.startsWith("/") ? path : `/${path}`, { body }), {

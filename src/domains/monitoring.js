@@ -70,7 +70,7 @@ export function registerMonitoringTools(server) {
       inputSchema: { messageGuid: z.string() },
     },
     readHandler(({ messageGuid }) =>
-      cpiGet(`/MessageProcessingLogs(${odataString(messageGuid)})/MessageProcessingLogCustomHeaderProperties`)
+      cpiGet(`/MessageProcessingLogs(${odataString(messageGuid)})/CustomHeaderProperties`)
     )
   );
 

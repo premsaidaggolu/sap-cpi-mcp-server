@@ -4,6 +4,7 @@ import { registerContentTools } from "./domains/content.js";
 import { registerRuntimeTools } from "./domains/runtime.js";
 import { registerAdminTools } from "./domains/admin.js";
 import { registerGenericTools } from "./domains/generic.js";
+import { registerWhereUsedTools } from "./domains/whereUsed.js";
 
 export function registerTools(server) {
   registerMonitoringTools(server); // MPL logs, message store, cancel
@@ -11,4 +12,5 @@ export function registerTools(server) {
   registerRuntimeTools(server); // deploy/undeploy, deployed artifacts, endpoints
   registerAdminTools(server); // security material, number ranges, data stores, queues, partners, logs
   registerGenericTools(server); // catalog + cpi_query / cpi_get_entity / cpi_invoke_function / cpi_write
+  registerWhereUsedTools(server); // where_used — search a word across flow content
 }

@@ -27,6 +27,50 @@ function assertConfig() {
   }
 }
 
+// --- Host masking ------------------------------------------------------------
+// Tool results (and error messages) must never expose the real CPI tenant
+// hostname to callers. Hosts are derived from env at call time so this works
+// for whatever tenant is configured — nothing tenant-specific is hardcoded.
+function maskTargets() {
+  const cfg = config();
+  const targets = [];
+  const add = (raw, placeholder) => {
+    if (!raw) return;
+    try {
+      const { host } = new URL(raw);
+      if (host) targets.push({ host, placeholder });
+    } catch {
+      // Not a valid URL — nothing to mask.
+    }
+  };
+  add(cfg.CPI_BASE_URL, "<cpi-tenant-host>");
+  add(cfg.CPI_TOKEN_URL, "<cpi-auth-host>");
+  // Longest host first so overlapping hostnames don't get partially replaced.
+  return targets.sort((a, b) => b.host.length - a.host.length);
+}
+
+/** Replace any configured CPI hostname found in a string with a generic placeholder. */
+export function maskString(value) {
+  if (typeof value !== "string" || !value) return value;
+  let out = value;
+  for (const { host, placeholder } of maskTargets()) {
+    if (out.includes(host)) out = out.split(host).join(placeholder);
+  }
+  return out;
+}
+
+/** Recursively apply maskString to every string in an object/array. */
+export function maskDeep(value) {
+  if (typeof value === "string") return maskString(value);
+  if (Array.isArray(value)) return value.map(maskDeep);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = maskDeep(v);
+    return out;
+  }
+  return value;
+}
+
 // --- Token cache -----------------------------------------------------------
 let cachedToken = null;
 let cachedTokenExpiry = 0; // epoch ms
@@ -68,7 +112,12 @@ async function getAccessToken() {
  * @param {string} path  Path relative to CPI_BASE_URL, e.g. "/MessageProcessingLogs"
  * @param {Object} [query]  Key/value query params (OData system query options).
  * @param {Object} [opts]
- * @param {boolean} [opts.raw]  If true, return the raw text body (used for $value endpoints).
+ * @param {boolean} [opts.raw]  If true, return the raw text body (used for textual $value
+ *   endpoints like ErrorInformation — NOT safe for binary content, see opts.binary).
+ * @param {boolean} [opts.binary]  If true, return the raw response body as a Buffer (used for
+ *   binary $value endpoints, e.g. downloading an integration flow's zip). Reading binary content
+ *   via res.text() corrupts it: any byte sequence that isn't valid UTF-8 gets irreversibly
+ *   replaced (U+FFFD), so it must be read via res.arrayBuffer() instead.
  */
 export async function cpiGet(path, query = {}, opts = {}) {
   const token = await getAccessToken();
@@ -78,7 +127,7 @@ export async function cpiGet(path, query = {}, opts = {}) {
   // If the API complains about one, we drop it and retry (filter is NOT dropped,
   // since removing it would silently change the result set).
   const effectiveQuery = { ...query };
-  let useFormat = !opts.raw && query.$format === undefined;
+  let useFormat = !opts.raw && !opts.binary && query.$format === undefined;
 
   const doFetch = () => {
     const url = new URL(`${CPI_BASE_URL}${path}`);
@@ -90,7 +139,11 @@ export async function cpiGet(path, query = {}, opts = {}) {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: opts.raw ? "text/plain, */*" : "application/json",
+        Accept: opts.binary
+          ? "application/octet-stream, */*"
+          : opts.raw
+            ? "text/plain, */*"
+            : "application/json",
       },
     });
   };
@@ -99,12 +152,19 @@ export async function cpiGet(path, query = {}, opts = {}) {
   let res = await doFetch();
   for (let i = 0; i < 6 && !res.ok && (res.status === 400 || res.status === 501); i++) {
     const peek = await res.clone().text().catch(() => "");
-    if (!/not supported|not implemented/i.test(peek)) break;
-    if (useFormat && /format query option/i.test(peek)) {
+    // $format=json is purely a serialization hint (the Accept: application/json header
+    // already asks for the same thing) — dropping it can't change query semantics, so
+    // try that first on any 400/501, regardless of the error text. Some CPI entities
+    // (media-link entries like IntegrationDesigntimeArtifacts) 501 on $format=json for
+    // single-entity GETs with an unrelated-looking error message ("No message reference
+    // given...") instead of a clean "format not supported" one, so the text-based check
+    // below never catches it.
+    if (useFormat) {
       useFormat = false;
       res = await doFetch();
       continue;
     }
+    if (!/not supported|not implemented/i.test(peek)) break;
     const offending = DROPPABLE.find(
       (opt) => effectiveQuery[opt] !== undefined && new RegExp(`\\$?${opt.slice(1)}\\b`, "i").test(peek)
     );
@@ -117,6 +177,11 @@ export async function cpiGet(path, query = {}, opts = {}) {
     const text = await res.text().catch(() => "");
     throw new Error(`CPI API GET ${path} failed (${res.status}): ${text.slice(0, 2000)}`);
   }
+
+  // Binary content (e.g. a zipped integration flow) must be read as bytes, never as text —
+  // res.text() assumes/decodes UTF-8 and silently corrupts any byte sequence that isn't valid
+  // UTF-8, which most compressed/binary data isn't.
+  if (opts.binary) return Buffer.from(await res.arrayBuffer());
 
   if (opts.raw) return res.text();
 

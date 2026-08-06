@@ -117,12 +117,18 @@ export function registerContentTools(server) {
       inputSchema: { artifactId: z.string(), version: z.string().default("active") },
     },
     readHandler(async ({ artifactId, version }) => {
-      const b64 = await cpiGet(
+      const buf = await cpiGet(
         `/IntegrationDesigntimeArtifacts(Id=${odataString(artifactId)},Version=${odataString(version)})/$value`,
         {},
-        { raw: true }
+        { binary: true }
       );
-      return { artifactId, version, encoding: "base64", contentLength: b64.length, content: b64 };
+      return {
+        artifactId,
+        version,
+        encoding: "base64",
+        contentLength: buf.length,
+        content: buf.toString("base64"),
+      };
     })
   );
 

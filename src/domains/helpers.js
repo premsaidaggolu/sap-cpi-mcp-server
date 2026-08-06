@@ -1,16 +1,18 @@
 // Shared helpers for tool handlers.
-import { assertWriteAllowed } from "../cpiClient.js";
+import { assertWriteAllowed, maskDeep, maskString } from "../cpiClient.js";
 
 export function jsonResult(data) {
+  const masked = maskDeep(data);
   return {
     content: [
-      { type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) },
+      { type: "text", text: typeof masked === "string" ? masked : JSON.stringify(masked, null, 2) },
     ],
   };
 }
 
 export function errorResult(err) {
-  return { isError: true, content: [{ type: "text", text: `Error: ${err.message || String(err)}` }] };
+  const message = maskString(err.message || String(err));
+  return { isError: true, content: [{ type: "text", text: `Error: ${message}` }] };
 }
 
 /**

@@ -7,7 +7,7 @@
 //   3. Else -> open (no auth).
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-function getXsuaaCredentials() {
+export function getXsuaaCredentials() {
   try {
     const vcap = JSON.parse(process.env.VCAP_SERVICES || "{}");
     const arr = vcap.xsuaa || vcap.XSUAA;

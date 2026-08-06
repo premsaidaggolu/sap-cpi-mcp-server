@@ -12,7 +12,7 @@ import express from "express";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { registerTools } from "./tools.js";
-import { authMiddleware } from "./auth.js";
+import { authMiddleware, getXsuaaCredentials } from "./auth.js";
 
 // Best-effort: load a local .env (project root) so stdio runs pick up credentials
 // without needing them duplicated into the MCP client config. Existing env vars win.
@@ -51,6 +51,63 @@ async function runHttp() {
 
   // Simple health endpoint for Cloud Foundry.
   app.get("/health", (_req, res) => res.json({ status: "ok", server: SERVER_INFO }));
+
+  // OAuth discovery + authorize/token façade.
+  //
+  // Remote MCP OAuth clients (e.g. Claude custom connectors) resolve the authorization
+  // server either via RFC 8414 discovery at this origin, or — if that's absent — by
+  // assuming /authorize and /token live on the MCP server's own host. XSUAA's real
+  // endpoints live on a different host (the UAA tenant), so without this, clients 404
+  // hitting <this-origin>/authorize directly. This exposes both: proper discovery
+  // metadata pointing at the real XSUAA endpoints, plus same-origin /authorize (redirect)
+  // and /token (proxy) routes as a fallback for clients that skip discovery.
+  const xsuaa = getXsuaaCredentials();
+  if (xsuaa && xsuaa.url) {
+    const uaaUrl = xsuaa.url.replace(/\/$/, "");
+    const authServerMetadata = {
+      issuer: uaaUrl,
+      authorization_endpoint: `${uaaUrl}/oauth/authorize`,
+      token_endpoint: `${uaaUrl}/oauth/token`,
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code", "client_credentials", "refresh_token"],
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+    };
+
+    app.get("/.well-known/oauth-authorization-server", (_req, res) => res.json(authServerMetadata));
+
+    // Browser-facing: just redirect to the real XSUAA authorize endpoint, forwarding
+    // every query param (client_id, redirect_uri, code_challenge, state, ...) as-is.
+    // XSUAA handles login/consent and redirects straight back to the caller's redirect_uri.
+    app.get("/authorize", (req, res) => {
+      const qs = new URLSearchParams(req.query).toString();
+      res.redirect(`${uaaUrl}/oauth/authorize?${qs}`);
+    });
+
+    // Server-to-server: proxy the code/token exchange through to the real XSUAA token
+    // endpoint and relay its response verbatim.
+    app.post("/token", express.urlencoded({ extended: true }), async (req, res) => {
+      try {
+        const upstream = await fetch(`${uaaUrl}/oauth/token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
+          },
+          body: new URLSearchParams(req.body).toString(),
+        });
+        const text = await upstream.text();
+        res.status(upstream.status);
+        res.set("Content-Type", upstream.headers.get("content-type") || "application/json");
+        res.send(text);
+      } catch (err) {
+        console.error("[sap-cpi-mcp-server] /token proxy error:", err);
+        res.status(502).json({ error: "token_proxy_failed", detail: err.message });
+      }
+    });
+  } else {
+    console.warn("[oauth-proxy] No XSUAA binding found — /authorize and /token routes not mounted.");
+  }
 
   // Authentication: OAuth 2.0 (XSUAA JWT) when bound, else static token, else open.
   app.use("/mcp", authMiddleware());

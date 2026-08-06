@@ -99,7 +99,7 @@ export function registerAdminTools(server) {
             MaxValue: String(maxValue),
             CurrentValue: String(currentValue),
             Rotate: String(rotate),
-            FieldLength: fieldLength,
+            FieldLength: String(fieldLength),
           },
         }),
       { action: ({ name }) => `create number range '${name}'` }
