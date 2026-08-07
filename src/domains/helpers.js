@@ -1,5 +1,20 @@
 // Shared helpers for tool handlers.
 import { assertWriteAllowed, maskDeep, maskString } from "../cpiClient.js";
+import { hasScope } from "../requestScope.js";
+
+function permissionDenied(scope) {
+  return {
+    isError: true,
+    content: [
+      {
+        type: "text",
+        text:
+          `Permission denied: this tool requires the '${scope}' scope, which your session's ` +
+          `role does not grant. Ask an admin to assign the BTP role collection that includes it.`,
+      },
+    ],
+  };
+}
 
 export function jsonResult(data) {
   const masked = maskDeep(data);
@@ -17,27 +32,42 @@ export function errorResult(err) {
 
 /**
  * Wrap a read-only handler with standard error handling.
+ * Requires the 'mcp.read' scope — granted to every role (Support, Developer, Architect).
+ * The returned function carries .requiredScope so registerScopedTool (below) can decide
+ * whether to register the tool at all for the current caller, not just gate the call.
  */
 export function readHandler(fn) {
-  return async (args) => {
+  const wrapped = async (args) => {
+    if (!hasScope("mcp.read")) return permissionDenied("mcp.read");
     try {
       return jsonResult(await fn(args));
     } catch (err) {
       return errorResult(err);
     }
   };
+  wrapped.requiredScope = "mcp.read";
+  return wrapped;
 }
 
 /**
- * Wrap a write handler: enforce ALLOW_WRITE, then require an explicit confirmation.
+ * Wrap a write handler: enforce role + ALLOW_WRITE, then require an explicit confirmation.
  * EVERY write action asks "are you sure?" and only proceeds when args.confirm === true.
+ *
+ * Required scope: 'mcp.write' (Developer, Architect) by default; 'mcp.delete' (Architect
+ * only) when opts.destructive is set — a destructive action is exactly the kind of thing
+ * the delete tier exists to gate. Pass opts.scope to override this inference directly,
+ * which the generic escape-hatch tools (cpi_write, cpi_invoke_function) use to force
+ * 'mcp.delete': they can reach operations no curated tool exposes, including deletes.
  * @param {Object} [opts]
  * @param {(args:any)=>string} [opts.action]  Human description of the action (used in the prompt).
  * @param {(args:any)=>string|null} [opts.destructive]  Legacy alias for opts.action; if it returns
- *   null the confirm gate is skipped for that call.
+ *   null the confirm gate is skipped for that call. Its presence alone requires 'mcp.delete'.
+ * @param {string} [opts.scope]  Explicit required scope, overriding the action/destructive inference.
  */
 export function writeHandler(fn, opts = {}) {
-  return async (args) => {
+  const requiredScope = opts.scope || (opts.destructive ? "mcp.delete" : "mcp.write");
+  const wrapped = async (args) => {
+    if (!hasScope(requiredScope)) return permissionDenied(requiredScope);
     try {
       assertWriteAllowed();
 
@@ -71,4 +101,21 @@ export function writeHandler(fn, opts = {}) {
       return errorResult(err);
     }
   };
+  wrapped.requiredScope = requiredScope;
+  return wrapped;
+}
+
+/**
+ * Register a tool only if the current caller's scope (see requestScope.js) satisfies
+ * `handler.requiredScope`, as set by readHandler/writeHandler above. Outside a request
+ * context (stdio transport) hasScope() is always true, so this registers everything,
+ * unchanged from before RBAC existed.
+ *
+ * This is what actually keeps a tool out of tools/list for a role that can't use it —
+ * the scope check inside readHandler/writeHandler only stops the tool from *running*
+ * if called anyway (defense in depth), it doesn't hide it from the tool list on its own.
+ */
+export function registerScopedTool(server, name, config, handler) {
+  if (!hasScope(handler.requiredScope)) return;
+  server.registerTool(name, config, handler);
 }

@@ -3,7 +3,7 @@
 // surface is covered even where there is no curated tool.
 import { z } from "zod";
 import { cpiGet, cpiRequest, cpiInvoke, odataKey } from "../cpiClient.js";
-import { readHandler, writeHandler } from "./helpers.js";
+import { readHandler, writeHandler, registerScopedTool } from "./helpers.js";
 
 // Discovered from this tenant's $metadata (com.sap.hci.api).
 const ENTITY_SETS = [
@@ -71,7 +71,7 @@ const FUNCTION_IMPORTS = [
 ];
 
 export function registerGenericTools(server) {
-  server.registerTool(
+  registerScopedTool(server,
     "cpi_api_catalog",
     {
       title: "CPI API Catalog (discover entity sets & operations)",
@@ -92,7 +92,7 @@ export function registerGenericTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "cpi_query",
     {
       title: "CPI Query (read any entity set)",
@@ -120,7 +120,7 @@ export function registerGenericTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "cpi_get_entity",
     {
       title: "CPI Get Entity (read one record by key)",
@@ -142,7 +142,7 @@ export function registerGenericTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "cpi_invoke_function",
     {
       title: "CPI Invoke Function Import (run any operation)",
@@ -158,10 +158,13 @@ export function registerGenericTools(server) {
     },
     writeHandler(({ functionName, params, method }) => cpiInvoke(functionName, params || {}, method), {
       action: ({ functionName }) => `invoke function import '${functionName}'`,
+      // Generic escape hatch: can reach function imports curated tools don't expose,
+      // some of them destructive (e.g. DeleteValMaps). Architect-only regardless of args.
+      scope: "mcp.delete",
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "cpi_write",
     {
       title: "CPI Write (create/update/delete any entity)",
@@ -178,6 +181,9 @@ export function registerGenericTools(server) {
     },
     writeHandler(({ method, path, body }) => cpiRequest(method, path.startsWith("/") ? path : `/${path}`, { body }), {
       action: ({ method, path }) => `${method} ${path}`,
+      // Generic escape hatch: arbitrary POST/PUT/DELETE/MERGE against any entity path,
+      // unbounded by the curated tools' guardrails. Architect-only regardless of method.
+      scope: "mcp.delete",
     })
   );
 }

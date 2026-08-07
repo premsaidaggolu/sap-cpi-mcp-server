@@ -2,7 +2,7 @@
 // service endpoints.
 import { z } from "zod";
 import { cpiGet, cpiRequest, cpiInvoke, odataString } from "../cpiClient.js";
-import { readHandler, writeHandler } from "./helpers.js";
+import { readHandler, writeHandler, registerScopedTool } from "./helpers.js";
 
 // Map artifact type -> deploy function import name.
 const DEPLOY_FN = {
@@ -14,7 +14,7 @@ const DEPLOY_FN = {
 };
 
 export function registerRuntimeTools(server) {
-  server.registerTool(
+  registerScopedTool(server,
     "list_deployed_artifacts",
     {
       title: "List Deployed Runtime Artifacts",
@@ -25,7 +25,7 @@ export function registerRuntimeTools(server) {
     readHandler(({ top }) => cpiGet("/IntegrationRuntimeArtifacts", { $top: top }))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_deployed_artifact_status",
     {
       title: "Get Deployed Artifact Status",
@@ -50,7 +50,7 @@ export function registerRuntimeTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "deploy_artifact",
     {
       title: "Deploy Artifact",
@@ -76,7 +76,7 @@ export function registerRuntimeTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "undeploy_artifact",
     {
       title: "Undeploy Artifact",
@@ -91,7 +91,7 @@ export function registerRuntimeTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_build_and_deploy_status",
     {
       title: "Get Build & Deploy Status",
@@ -102,7 +102,7 @@ export function registerRuntimeTools(server) {
     readHandler(({ taskId }) => cpiGet(`/BuildAndDeployStatus(TaskId=${odataString(taskId)})`))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "list_service_endpoints",
     {
       title: "List Service Endpoints",

@@ -3,11 +3,11 @@
 // tail of entities is reachable via the generic tools (cpi_query / cpi_write / cpi_invoke).
 import { z } from "zod";
 import { cpiGet, cpiRequest, odataString, odataKey } from "../cpiClient.js";
-import { readHandler, writeHandler } from "./helpers.js";
+import { readHandler, writeHandler, registerScopedTool } from "./helpers.js";
 
 export function registerAdminTools(server) {
   // --- Security material --------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_user_credentials",
     {
       title: "List User Credentials (Security Material)",
@@ -17,7 +17,7 @@ export function registerAdminTools(server) {
     readHandler(({ top }) => cpiGet("/UserCredentials", { $top: top }))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "deploy_user_credential",
     {
       title: "Deploy User Credential",
@@ -42,7 +42,7 @@ export function registerAdminTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "list_oauth2_client_credentials",
     {
       title: "List OAuth2 Client Credentials",
@@ -52,7 +52,7 @@ export function registerAdminTools(server) {
     readHandler(({ top }) => cpiGet("/OAuth2ClientCredentials", { $top: top }))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "list_keystore_entries",
     {
       title: "List Keystore Entries (Certificates)",
@@ -63,7 +63,7 @@ export function registerAdminTools(server) {
   );
 
   // --- Number ranges ------------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_number_ranges",
     {
       title: "List Number Ranges",
@@ -73,7 +73,7 @@ export function registerAdminTools(server) {
     readHandler(() => cpiGet("/NumberRanges"))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "create_number_range",
     {
       title: "Create Number Range",
@@ -107,7 +107,7 @@ export function registerAdminTools(server) {
   );
 
   // --- Data stores --------------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_data_stores",
     {
       title: "List Data Stores",
@@ -117,7 +117,7 @@ export function registerAdminTools(server) {
     readHandler(({ top }) => cpiGet("/DataStores", { $top: top }))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_data_store_entries",
     {
       title: "Get Data Store Entries",
@@ -139,7 +139,7 @@ export function registerAdminTools(server) {
   );
 
   // --- Variables ----------------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_variables",
     {
       title: "List Variables",
@@ -150,7 +150,7 @@ export function registerAdminTools(server) {
   );
 
   // --- Queues -------------------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_jms_queues",
     {
       title: "List JMS Queues",
@@ -161,7 +161,7 @@ export function registerAdminTools(server) {
   );
 
   // --- Partner Directory (B2B) -------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_partners",
     {
       title: "List Partner Directory Partners",
@@ -172,7 +172,7 @@ export function registerAdminTools(server) {
   );
 
   // --- Logs ---------------------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_log_files",
     {
       title: "List System Log Files",

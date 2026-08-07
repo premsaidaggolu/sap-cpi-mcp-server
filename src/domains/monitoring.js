@@ -1,10 +1,10 @@
 // Message monitoring domain: Message Processing Logs (MPL), message store, traces.
 import { z } from "zod";
 import { cpiGet, cpiInvoke, odataString, odataDateTime } from "../cpiClient.js";
-import { readHandler, writeHandler } from "./helpers.js";
+import { readHandler, writeHandler, registerScopedTool } from "./helpers.js";
 
 export function registerMonitoringTools(server) {
-  server.registerTool(
+  registerScopedTool(server,
     "search_message_processing_logs",
     {
       title: "Search Message Processing Logs (MPL)",
@@ -33,7 +33,7 @@ export function registerMonitoringTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_mpl_details",
     {
       title: "Get MPL Details",
@@ -45,7 +45,7 @@ export function registerMonitoringTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_mpl_error_information",
     {
       title: "Get MPL Error Information",
@@ -62,7 +62,7 @@ export function registerMonitoringTools(server) {
     }))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_mpl_custom_header_properties",
     {
       title: "Get MPL Custom Header Properties",
@@ -74,7 +74,7 @@ export function registerMonitoringTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_mpl_run_steps",
     {
       title: "Get MPL Run Steps",
@@ -87,7 +87,7 @@ export function registerMonitoringTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_message_store_entries",
     {
       title: "Get Message Store Entries",
@@ -100,7 +100,7 @@ export function registerMonitoringTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_failure_summary",
     {
       title: "Get Failure Summary",
@@ -132,7 +132,7 @@ export function registerMonitoringTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "cancel_message_processing_log",
     {
       title: "Cancel Message Processing Log",

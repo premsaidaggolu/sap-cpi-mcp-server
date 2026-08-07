@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { registerTools } from "./tools.js";
 import { authMiddleware, getXsuaaCredentials } from "./auth.js";
+import { scopeStorage } from "./requestScope.js";
 
 // Best-effort: load a local .env (project root) so stdio runs pick up credentials
 // without needing them duplicated into the MCP client config. Existing env vars win.
@@ -114,30 +115,36 @@ async function runHttp() {
 
   // Stateless Streamable HTTP: a fresh transport + server per request.
   app.post("/mcp", async (req, res) => {
-    try {
-      const server = buildServer();
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        // Return a single application/json response instead of an SSE stream.
-        // Friendlier for Postman/curl; MCP SDK clients still handle it fine.
-        enableJsonResponse: true,
-      });
-      res.on("close", () => {
-        transport.close();
-        server.close();
-      });
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-    } catch (err) {
-      console.error("[sap-cpi-mcp-server] request error:", err);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          error: { code: -32603, message: "Internal server error" },
-          id: null,
+    // Every tool call this request makes runs inside this scope, so readHandler/
+    // writeHandler (domains/helpers.js) can see the caller's role via
+    // requestScope.currentScopes() without req ever being threaded through the
+    // MCP SDK's own dispatch. req.authScopes was set by authMiddleware above.
+    await scopeStorage.run({ scopes: req.authScopes ?? null }, async () => {
+      try {
+        const server = buildServer();
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          // Return a single application/json response instead of an SSE stream.
+          // Friendlier for Postman/curl; MCP SDK clients still handle it fine.
+          enableJsonResponse: true,
         });
+        res.on("close", () => {
+          transport.close();
+          server.close();
+        });
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+      } catch (err) {
+        console.error("[sap-cpi-mcp-server] request error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: "2.0",
+            error: { code: -32603, message: "Internal server error" },
+            id: null,
+          });
+        }
       }
-    }
+    });
   });
 
   // GET/DELETE on /mcp are not used in stateless mode.
