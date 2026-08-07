@@ -5,14 +5,41 @@
   "scopes": [
     {
       "name": "$XSAPPNAME.Use",
-      "description": "Permission to call the SAP CPI MCP server"
+      "description": "Legacy: permission to call the SAP CPI MCP server (pre-RBAC, kept so existing assignments keep working)"
+    },
+    {
+      "name": "$XSAPPNAME.mcp.read",
+      "description": "Read MPLs, packages, flows, deployed artifacts, security material, etc."
+    },
+    {
+      "name": "$XSAPPNAME.mcp.write",
+      "description": "Create/update/deploy tools (non-destructive changes)"
+    },
+    {
+      "name": "$XSAPPNAME.mcp.delete",
+      "description": "Delete/undeploy tools, plus the generic cpi_write / cpi_invoke_function escape hatches"
     }
   ],
   "role-templates": [
     {
       "name": "CpiMcpUser",
-      "description": "Can call the SAP CPI MCP server",
+      "description": "Legacy role — treated as read-only by the server (kept so existing assignments keep working)",
       "scope-references": ["$XSAPPNAME.Use"]
+    },
+    {
+      "name": "Support",
+      "description": "Read-only: monitoring, MPL search, package/flow inspection",
+      "scope-references": ["$XSAPPNAME.mcp.read"]
+    },
+    {
+      "name": "Developer",
+      "description": "Read + create/update/deploy, no deletes",
+      "scope-references": ["$XSAPPNAME.mcp.read", "$XSAPPNAME.mcp.write"]
+    },
+    {
+      "name": "Architect",
+      "description": "Full access, including delete/undeploy and the generic escape-hatch tools",
+      "scope-references": ["$XSAPPNAME.mcp.read", "$XSAPPNAME.mcp.write", "$XSAPPNAME.mcp.delete"]
     }
   ],
   "oauth2-configuration": {

@@ -4,7 +4,7 @@
 import { z } from "zod";
 import JSZip from "jszip";
 import { cpiGet, odataString } from "../cpiClient.js";
-import { readHandler } from "./helpers.js";
+import { readHandler, registerScopedTool } from "./helpers.js";
 
 // Extensions worth searching as text. Everything else inside an iflow zip
 // (icons, jars, etc.) is skipped — searching binary content as text is both
@@ -64,7 +64,7 @@ async function searchOneFlow(artifactId, version, word) {
 }
 
 export function registerWhereUsedTools(server) {
-  server.registerTool(
+  registerScopedTool(server,
     "where_used",
     {
       title: "Where Used — Search a Word Across Integration Flow Content",

@@ -5,7 +5,26 @@
 //      OAuth 2.0 JWT issued by XSUAA (signature verified against XSUAA's JWKS, audience checked).
 //   2. Else if MCP_AUTH_TOKEN is set -> require that static bearer token (dev/fallback).
 //   3. Else -> open (no auth).
+//
+// Role-based access control: once a caller is authenticated, their granted scopes are
+// resolved to req.authScopes (see resolveScopes below) and carried into the tool layer
+// via requestScope.js. Three scopes exist (see xs-security.json): mcp.read, mcp.write,
+// mcp.delete — each a superset of the one before it (Support < Developer < Architect).
 import { createRemoteJWKSet, jwtVerify } from "jose";
+
+// Bare scope names this server understands. XSUAA returns them prefixed, e.g.
+// "sap-cpi-mcp!t1234.mcp.read" (tenant-mode: dedicated) — matched by suffix so this
+// is unaffected by tenant id or xsappname.
+const KNOWN_SCOPES = ["mcp.read", "mcp.write", "mcp.delete"];
+
+/** Reduce a raw XSUAA `scope` claim to the bare scope names this server checks. */
+function resolveOauthScopes(rawScope) {
+  const raw = Array.isArray(rawScope) ? rawScope : [];
+  const matched = KNOWN_SCOPES.filter((known) => raw.some((s) => s === known || s.endsWith(`.${known}`)));
+  // A token with none of the three scopes (e.g. a legacy token carrying only the old
+  // flat "Use" scope) gets read-only, not full access — least privilege by default.
+  return matched.length ? matched : ["mcp.read"];
+}
 
 export function getXsuaaCredentials() {
   try {
@@ -67,6 +86,7 @@ export function authMiddleware() {
         if (!audienceMatches(payload, xsuaa.clientid)) {
           return res.status(401).json({ error: "Token audience mismatch" });
         }
+        req.authScopes = resolveOauthScopes(payload.scope);
         return next();
       } catch (err) {
         return res.status(401).json({ error: "Invalid token", detail: err.message });
@@ -74,10 +94,17 @@ export function authMiddleware() {
     }
 
     if (staticToken) {
-      if (bearer === staticToken) return next();
+      if (bearer === staticToken) {
+        // A single shared static token has no per-user identity to hang a role off —
+        // grant full access, matching this mode's existing all-or-nothing behavior.
+        req.authScopes = ["mcp.read", "mcp.write", "mcp.delete"];
+        return next();
+      }
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Open mode (no auth configured at all) — same all-access behavior as before RBAC.
+    req.authScopes = ["mcp.read", "mcp.write", "mcp.delete"];
     return next();
   };
 }

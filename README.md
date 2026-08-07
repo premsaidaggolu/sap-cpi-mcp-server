@@ -91,6 +91,60 @@ ALLOW_WRITE=true    # enable the ⚠️ tools
 
 ---
 
+## Role-based access control (RBAC)
+
+Three roles, layered on top of `ALLOW_WRITE`/`confirm=true` rather than replacing them:
+
+| Role | Scope(s) granted | Can use |
+|------|-------------------|---------|
+| **Support** | `mcp.read` | Every read/list/search/download tool |
+| **Developer** | `mcp.read`, `mcp.write` | The above, plus create/update/deploy tools |
+| **Architect** | `mcp.read`, `mcp.write`, `mcp.delete` | Everything, including delete/undeploy and the generic `cpi_write` / `cpi_invoke_function` escape hatches |
+
+The generic escape-hatch tools (`cpi_write`, `cpi_invoke_function`) are pinned to `mcp.delete`
+regardless of the HTTP method or function called — they can reach operations (arbitrary
+DELETE, or destructive function imports like `DeleteValMaps`) that the curated tools don't
+expose, so they're Architect-only rather than Developer-only.
+
+This only applies to the **HTTP transport with an XSUAA binding**. The static-token and open
+modes grant full access to everyone (no per-user identity to hang a role off), and the
+**stdio transport is unaffected** — it's a local subprocess with no role boundary, same as before.
+
+### Setting it up in BTP
+
+1. `xs-security.json` already defines the scopes and role templates (`Support`, `Developer`,
+   `Architect` — plus the legacy `CpiMcpUser`/`Use` scope, kept so anyone already assigned it
+   keeps working, treated as read-only). Push the updated descriptor:
+   ```bash
+   cf update-service sap-cpi-mcp-xsuaa -c xs-security.json
+   cf restage sap-cpi-mcp-server
+   ```
+2. In BTP Cockpit → your subaccount → **Security → Role Collections**, create three
+   collections — `Architect`, `Developer`, `Support` — each pulling in the matching role
+   template from the `sap-cpi-mcp` app.
+3. Assign your team: either manually per user (Role Collection → Edit → add by email), or —
+   if you already trust an IdP like Entra ID — map IdP groups to these Role Collections under
+   **Security → Trust Configuration → your IdP → Role Collection Mappings**, so membership in
+   an Entra group like `MCP-Architect` grants the collection automatically at login.
+4. A user's token then carries whichever scopes their Role Collection grants; `src/auth.js`
+   reads them off the verified JWT and `src/domains/helpers.js` enforces them per tool call.
+
+### Testing a role change — watch for token caching
+
+After moving a user between Role Collections, the change **will not show up** until they get a
+genuinely new access token — MCP clients (including Claude.ai) cache the tool list and will
+silently reuse a still-valid token via refresh rather than re-authenticating. `token-validity`
+in `xs-security.json` is 3600s (1 hour), so a client can hold a stale scope set for up to an
+hour after a role change.
+
+To force a real re-check: fully **remove/delete the connector** in the client (not just
+"Disconnect" — that alone may not clear the cached token) and re-add it from scratch, so it
+goes through a brand-new OAuth login. Look for a "tools list refreshed"-style confirmation
+after reconnecting, and check the tool count actually changed, before concluding a role
+assignment didn't take effect.
+
+---
+
 ## Securing the HTTP endpoint with OAuth 2.0 (XSUAA)
 
 For the hosted (Cloud Foundry) endpoint, authentication is handled by `src/auth.js`:

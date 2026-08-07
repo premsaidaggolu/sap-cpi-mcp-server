@@ -2,11 +2,11 @@
 // collections, configurations, resources.
 import { z } from "zod";
 import { cpiGet, cpiRequest, cpiInvoke, odataString } from "../cpiClient.js";
-import { readHandler, writeHandler } from "./helpers.js";
+import { readHandler, writeHandler, registerScopedTool } from "./helpers.js";
 
 export function registerContentTools(server) {
   // --- Packages -----------------------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_integration_packages",
     {
       title: "List Integration Packages",
@@ -16,7 +16,7 @@ export function registerContentTools(server) {
     readHandler(({ top }) => cpiGet("/IntegrationPackages", { $top: top }))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_integration_package",
     {
       title: "Get Integration Package",
@@ -26,7 +26,7 @@ export function registerContentTools(server) {
     readHandler(({ packageId }) => cpiGet(`/IntegrationPackages(${odataString(packageId)})`))
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "create_integration_package",
     {
       title: "Create Integration Package",
@@ -48,7 +48,7 @@ export function registerContentTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "delete_integration_package",
     {
       title: "Delete Integration Package",
@@ -61,7 +61,7 @@ export function registerContentTools(server) {
     })
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "copy_integration_package",
     {
       title: "Copy Integration Package (from Hub / Discover)",
@@ -79,7 +79,7 @@ export function registerContentTools(server) {
   );
 
   // --- Integration flows (design-time artifacts) --------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "list_integration_flows",
     {
       title: "List Integration Flows in a Package",
@@ -91,7 +91,7 @@ export function registerContentTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "get_integration_flow",
     {
       title: "Get Integration Flow Details",
@@ -108,7 +108,7 @@ export function registerContentTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "download_integration_flow",
     {
       title: "Download Integration Flow (base64 zip)",
@@ -133,7 +133,7 @@ export function registerContentTools(server) {
   );
 
   // --- Configurations (externalized parameters) ---------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "get_flow_configurations",
     {
       title: "Get Flow Externalized Configurations",
@@ -148,7 +148,7 @@ export function registerContentTools(server) {
     )
   );
 
-  server.registerTool(
+  registerScopedTool(server,
     "update_flow_configuration",
     {
       title: "Update Flow Configuration Parameter",
@@ -175,7 +175,7 @@ export function registerContentTools(server) {
   );
 
   // --- Custom tags / resources -------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "get_flow_resources",
     {
       title: "Get Flow Resources",
@@ -190,7 +190,7 @@ export function registerContentTools(server) {
   );
 
   // --- Create integration flow -------------------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "create_integration_flow",
     {
       title: "Create Integration Flow",
@@ -215,7 +215,7 @@ export function registerContentTools(server) {
   );
 
   // --- Save integration flow as a version --------------------------------
-  server.registerTool(
+  registerScopedTool(server,
     "save_integration_flow_as_version",
     {
       title: "Save Integration Flow as Version",
