@@ -112,9 +112,10 @@ modes grant full access to everyone (no per-user identity to hang a role off), a
 
 ### Setting it up in BTP
 
-1. `xs-security.json` already defines the scopes and role templates (`Support`, `Developer`,
-   `Architect` — plus the legacy `CpiMcpUser`/`Use` scope, kept so anyone already assigned it
-   keeps working, treated as read-only). Push the updated descriptor:
+1. `xs-security.json` defines exactly three scopes and role templates — `Support`, `Developer`,
+   `Architect`. There is no legacy/default role: a caller not assigned one of these three gets
+   an empty scope set and no tools at all (see `resolveOauthScopes` in `src/auth.js`), not
+   silent read-only access. Push the updated descriptor:
    ```bash
    cf update-service sap-cpi-mcp-xsuaa -c xs-security.json
    cf restage sap-cpi-mcp-server
