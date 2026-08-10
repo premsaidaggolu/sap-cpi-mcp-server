@@ -246,45 +246,349 @@ claude mcp add sap-cpi -- node C:/path/to/sap-cpi-mcp-server/src/index.js
 
 ## 3. Deploy to SAP BTP Cloud Foundry (HTTP)
 
+A full walkthrough of deploying this server as a Cloud Foundry app, securing it with XSUAA, and
+connecting it to Claude as a custom connector — done entirely through the **BTP Cockpit web UI**
+(a `cf` CLI equivalent is in [Appendix A](#appendix-a--equivalent-cf-cli-commands) below for
+anyone who prefers the command line).
+
+### What you will end up with
+
+- A running Cloud Foundry application (`sap-cpi-mcp-server`) that exposes the MCP server over
+  HTTPS at a `/mcp` endpoint.
+- The application securely calling your SAP CPI tenant's OData APIs using OAuth client
+  credentials.
+- An XSUAA-protected front door, so only users assigned to an approved role collection can reach
+  the MCP endpoint.
+- Claude connected to that endpoint as a custom connector, able to call all 45 CPI tools directly
+  from a chat.
+
+### Architecture at a glance
+
+| Component | Role |
+|---|---|
+| GitHub repository (`sap-cpi-mcp-server`) | Node.js MCP server source code — 45 tools for CPI monitoring and management. |
+| Cloud Foundry application (`sap-cpi-mcp-server`) | Runs the MCP server as an HTTP service; exposes `/health` and `/mcp` endpoints. |
+| Process Integration Runtime service key | OAuth client the app uses to call your CPI tenant's OData / monitoring APIs. |
+| XSUAA service instance (`sap-cpi-mcp-server-xsuaa`) | Issues OAuth tokens that protect the `/mcp` endpoint from unauthenticated access. |
+| Role Collections | Map SAP BTP users to Architect / Developer / Support levels of access on the MCP server (see [RBAC](#role-based-access-control-rbac) above). |
+| Claude custom connector | Calls the deployed `/mcp` endpoint over HTTPS, authenticating via the XSUAA OAuth credentials. |
+
+### Prerequisites
+
+- An SAP BTP account (trial or licensed) with entitlement for Cloud Foundry Runtime and
+  Authorization and Trust Management Service.
+- Space Developer authorization on the target Cloud Foundry space.
+- Rights to create a Process Integration Runtime service key on the CPI subaccount (for OAuth
+  credentials).
+- A Claude plan that supports custom connectors (Settings → Connectors).
+
+### Part A — Package the MCP Server for Deployment
+
+#### Step 1 — Download the Source Code
+
+Open this GitHub repository and download the project as a ZIP archive.
+
+- Click **Code → Download ZIP**.
+
+![The sap-cpi-mcp-server GitHub repository, Code → Download ZIP.](docs/cloud-foundry-deployment/image1.png)
+
+*Figure 1 — The sap-cpi-mcp-server GitHub repository, Code → Download ZIP.*
+
+#### Step 2 — Prepare the Deployment ZIP
+
+Cloud Foundry's build pack looks for `package.json` at the root of the uploaded archive.
+GitHub's downloaded ZIP wraps everything inside a folder (e.g., `sap-cpi-mcp-server-main/`), so
+it needs to be re-zipped.
+
+1. Extract the downloaded ZIP and open the extracted folder.
+2. Select `package.json`, `package-lock.json` and the `src` folder (do not select the enclosing
+   folder itself).
+3. Right-click → **Send to → Compressed (zipped) folder**, and name it `sap-cpi-mcp-server.zip`.
+
+![Selecting package.json, package-lock.json and src, then Send to → Compressed (zipped) folder.](docs/cloud-foundry-deployment/image2.png)
+
+*Figure 2 — Selecting package.json, package-lock.json and src, then Send to → Compressed (zipped)
+folder.*
+
+> ⚠️ **Watch out:** If you instead zip the whole extracted folder, `package.json` ends up one
+> level too deep and staging will fail with a "module not found" style error. Verify the new zip
+> opens straight into `package.json`, `src/`, etc. — not into another folder.
+
+### Part B — Set Up Cloud Foundry on SAP BTP
+
+#### Step 3 — Enable the Cloud Foundry Environment
+
+In the BTP Cockpit, open your subaccount's Overview page. If Cloud Foundry hasn't been enabled
+yet, do so from here.
+
+![Subaccount Overview, with the Cloud Foundry Environment panel and Enable Cloud Foundry.](docs/cloud-foundry-deployment/image3.png)
+
+*Figure 3 — Subaccount Overview, with the Cloud Foundry Environment panel and Enable Cloud
+Foundry.*
+
+![Cloud Foundry Environment details: API endpoint, org name/ID, and the Spaces list.](docs/cloud-foundry-deployment/image4.png)
+
+*Figure 4 — Cloud Foundry Environment details: API endpoint, org name/ID, and the Spaces list.*
+
+#### Step 4 — Create Space
+
+Click **Create Space** (top-right of the Spaces panel shown above) and name it — for example,
+`dev`. This is the space you will deploy the application into.
+
+### Part C — Deploy the Application
+
+#### Step 5 — Deploy via BTP Cockpit
+
+Open the `dev` space → **Applications** and click **Deploy Application**.
+
+![The Deploy Application dialog: File location, Deploy with (Manifest/Custom Settings), Manifest location.](docs/cloud-foundry-deployment/image5.png)
+
+*Figure 5 — The Deploy Application dialog: File location, Deploy with (Manifest/Custom
+Settings), Manifest location.*
+
+1. Upload the re-zipped file (`sap-cpi-mcp-server.zip`) at **File location**.
+2. Keep **Deploy with** set to **Manifest**.
+3. Browse to `manifest.yml` from the extracted folder for **Manifest location**.
+4. Keep **Start application after deploy** checked, then click **Deploy**.
+
+![Dialog filled in with sap-cpi-mcp-server.zip and manifest.yml, ready to deploy.](docs/cloud-foundry-deployment/image6.png)
+
+*Figure 6 — Dialog filled in with sap-cpi-mcp-server.zip and manifest.yml, ready to deploy.*
+
+#### Step 6 — Confirm the Application Is Running
+
+Once deployment finishes, the application appears in the Applications list with a **Started**
+state.
+
+![Applications (1): sap-cpi-mcp-server, Requested State: Started.](docs/cloud-foundry-deployment/image7.png)
+
+*Figure 7 — Applications (1): sap-cpi-mcp-server, Requested State: Started.*
+
+Open it to see the Application Overview — buildpack, stack, and the Mapped Routes section with
+the public HTTPS URL Cloud Foundry assigned to the app.
+
+![Application Overview showing the nodejs_buildpack, cflinuxfs4 stack, and the Mapped Route.](docs/cloud-foundry-deployment/image8.png)
+
+*Figure 8 — Application Overview showing the nodejs_buildpack, cflinuxfs4 stack, and the Mapped
+Route.*
+
+#### Step 7 — Verify with a Health Check
+
+Open the Mapped Route link from Step 6 and append `/health` to it. A healthy deployment returns
+a small JSON payload confirming the server name, version, and an "ok" status.
+
+![GET /health returning status ok, server name and version.](docs/cloud-foundry-deployment/image9.png)
+
+*Figure 9 — GET /health returning `{ "status": "ok", "server": { "name": "sap-cpi-mcp-server",
+"version": "1.0.0" } }`.*
+
+### Part D — Connect the App to Your SAP CPI Tenant
+
+#### Step 8 — Create a Process Integration Runtime Service Key
+
+The app needs its own OAuth client to call your CPI tenant's OData APIs — see
+[1. Get CPI API credentials](#1-get-cpi-api-credentials-one-time) above for how to create it and
+which fields map to which env var.
+
+#### Step 9 — Configure Environment Variables
+
+In the application, go to **User-Provided Variables** and click **Create Variable** for each of
+`CPI_BASE_URL`, `CPI_TOKEN_URL`, `CPI_CLIENT_ID`, `CPI_CLIENT_SECRET`, `MCP_TRANSPORT=http`, and
+`ALLOW_WRITE` (keep `false` unless the connector should be allowed to write):
+
+![User-Provided Variables: ALLOW_WRITE, CPI_BASE_URL, CPI_CLIENT_ID, CPI_CLIENT_SECRET, CPI_TOKEN_URL, MCP_TRANSPORT.](docs/cloud-foundry-deployment/image10.png)
+
+*Figure 10 — User-Provided Variables: ALLOW_WRITE, CPI_BASE_URL, CPI_CLIENT_ID,
+CPI_CLIENT_SECRET, CPI_TOKEN_URL, MCP_TRANSPORT.*
+
+#### Step 10 — Restage the Application
+
+Environment variable changes only take effect after a restage.
+
+![Restage Application: "Restaging will cause application downtime."](docs/cloud-foundry-deployment/image11.png)
+
+*Figure 11 — Restage Application: "Restaging will cause application downtime."*
+
+![Application Overview after restage, confirming the app is Started and the route is live.](docs/cloud-foundry-deployment/image12.png)
+
+*Figure 12 — Application Overview after restage, confirming the app is Started and the route is
+live.*
+
+### Part E — Secure the Endpoint with XSUAA
+
+#### Step 11 — Create the XSUAA Service Instance
+
+In **Service Marketplace**, search for **Authorization and Trust Management Service** and click
+**Create**.
+
+1. Plan: **application**, Runtime Environment: **Cloud Foundry**, Space: **dev**.
+2. Instance Name: `sap-cpi-mcp-server-xsuaa`.
+
+![New Instance or Subscription: Authorization and Trust Management Service, plan application.](docs/cloud-foundry-deployment/image13.png)
+
+*Figure 13 — New Instance or Subscription: Authorization and Trust Management Service, plan
+application.*
+
+3. On the **Parameters** step, paste the contents of `xs-security.json` from the extracted
+   folder — this defines the app's `xsappname` and its OAuth scopes (`mcp.read`, `mcp.write`,
+   `mcp.delete`).
+4. Click **Create**.
+
+![Parameters step with the xs-security.json scopes and descriptions pasted in.](docs/cloud-foundry-deployment/image14.png)
+
+*Figure 14 — Parameters step with the xs-security.json scopes and descriptions pasted in.*
+
+#### Step 12 — Generate a Service Key for the Claude Connector
+
+Open the new `sap-cpi-mcp-server-xsuaa` instance → **Service Keys → Create**. These credentials
+are what Claude will use to authenticate to the MCP endpoint.
+
+![New Service Key dialog for the XSUAA instance.](docs/cloud-foundry-deployment/image15.png)
+
+*Figure 15 — New Service Key dialog for the XSUAA instance.*
+
+Open the key's Credentials (JSON view) to retrieve `clientid`, `clientsecret` and `url` — keep
+this panel handy for Part F.
+
+*Figure 16 — Service key credentials: clientid, clientsecret, url, identityzone, tenantid, etc.*
+
+> 🔒 Treat this credentials panel like a password screen — don't leave it visible in a
+> screenshot or screen share.
+
+#### Step 13 — Bind XSUAA to the Application
+
+In the application, go to **Service Bindings → Bind Service Instance**, choose
+`sap-cpi-mcp-server-xsuaa`, and confirm the binding.
+
+![Bind Service Instance: selecting sap-cpi-mcp-server-xsuaa (service: xsuaa, plan: application).](docs/cloud-foundry-deployment/image17.png)
+
+*Figure 17 — Bind Service Instance: selecting sap-cpi-mcp-server-xsuaa (service: xsuaa, plan:
+application).*
+
+> **Note:** Restart or restage the app again after binding so it picks up the new
+> `VCAP_SERVICES` credentials.
+
+#### Step 14 — Create Role Collections
+
+Under **Security → Role Collections**, create one collection per role template in
+`xs-security.json` (`Support`, `Developer`, `Architect` — see [RBAC](#role-based-access-control-rbac)
+above).
+
+![Create Role Collection: SapCpiMcp.Architect, mapped to the Architect role template.](docs/cloud-foundry-deployment/image18.png)
+
+*Figure 18 — Create Role Collection: SapCpiMcp.Architect, mapped to the Architect role template.*
+
+![Three role collections created: SapCpiMcp.Architect, .Developer and .Support.](docs/cloud-foundry-deployment/image19.png)
+
+*Figure 19 — Three role collections created: SapCpiMcp.Architect, .Developer and .Support.*
+
+#### Step 15 — Assign Users to Role Collections
+
+Open the relevant Role Collection and add each user under its **Users** tab — this determines
+what that person (or the account they sign in with when connecting Claude) is allowed to do
+through the MCP server.
+
+*Figure 20 — SapCpiMcp.Support role collection, with the Support role template and an assigned
+user.*
+
+### Part F — Connect to Claude
+
+#### Step 16 — Add a Custom Connector in Claude
+
+In Claude, go to **Settings → Connectors → Add → Add custom connector**.
+
+![Add custom connector: Name, Remote MCP Server URL, and Advanced settings for OAuth Client ID/Secret.](docs/cloud-foundry-deployment/image21.png)
+
+*Figure 21 — Add custom connector: Name, Remote MCP Server URL, and Advanced settings for OAuth
+Client ID/Secret.*
+
+#### Step 17 — Get the Remote MCP Server URL
+
+Back in the Cockpit, open the application's Application Overview and copy the Mapped Routes URL,
+then append `/mcp` to it — e.g. `https://sap-cpi-mcp-server.cfapps.<region>.hana.ondemand.com/mcp`.
+
+![Application Overview with the Mapped Route to copy (append /mcp when pasting into Claude).](docs/cloud-foundry-deployment/image22.png)
+
+*Figure 22 — Application Overview with the Mapped Route to copy (append /mcp when pasting into
+Claude).*
+
+#### Step 18 — Get the OAuth Client ID & Secret
+
+Open the service key you created in Step 12 and copy its `clientid` and `clientsecret` into the
+connector's **OAuth Client ID / OAuth Client Secret** fields.
+
+#### Step 19 — Connect and Authenticate
+
+Click **Add**, then **Connect**.
+
+![Connector added, showing the /mcp URL and a Connect button before authentication.](docs/cloud-foundry-deployment/image24.png)
+
+*Figure 24 — Connector added, showing the /mcp URL and a Connect button before authentication.*
+
+1. Claude redirects to your SAP identity provider's login page.
+2. Sign in with an account that has been assigned one of the `SapCpiMcp` role collections from
+   Step 15.
+3. Once authenticated, the connector shows as connected and all 45 MCP tools become available to
+   Claude.
+
+### Verification
+
+Confirm the end-to-end connection with two quick prompts in a new Claude chat:
+
+**"List out the tools available in the SAP CPI MCP server."**
+
+![Claude listing the full MCP tool catalog: discovery/catalog, packages & flows, deployment & runtime status, and more.](docs/cloud-foundry-deployment/image25.png)
+
+*Figure 25 — Claude listing the full MCP tool catalog: discovery/catalog, packages & flows,
+deployment & runtime status, and more.*
+
+**"List out the deployed interfaces."**
+
+![Claude calling list_deployed_artifacts and returning the tenant's actual deployed integration flow(s).](docs/cloud-foundry-deployment/image26.png)
+
+*Figure 26 — Claude calling list_deployed_artifacts and returning the tenant's actual deployed
+integration flow(s).*
+
+Both responses coming back with live tenant data confirm the full chain is working: **Claude →
+XSUAA-authenticated /mcp endpoint → Cloud Foundry app → SAP CPI OData API.**
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Staging fails / buildpack can't find `package.json` | The re-zipped archive still has a wrapping folder (e.g., `sap-cpi-mcp-server-main/package.json`). | Re-zip so `package.json`, `src/`, etc. sit at the root of the archive — see Step 2. |
+| App deploys but `/health` doesn't return status ok, or the app shows CRASHED | `MCP_TRANSPORT` isn't set to `http`, or the app wasn't restaged after the variable was added. | Check the app's Logs tab; confirm `MCP_TRANSPORT=http` is set, then restage (Step 10). |
+| Claude connector returns 401/403 after login | The signed-in user isn't in any `SapCpiMcp` role collection, or the XSUAA instance isn't bound to the app. | Confirm Service Bindings shows `sap-cpi-mcp-server-xsuaa` bound (Step 13), and assign the user to a role collection (Step 15). |
+| App is Running but CPI calls fail with 401 | `CPI_BASE_URL` / `CPI_CLIENT_ID` / `CPI_CLIENT_SECRET` are wrong, expired, or the service key lacks the required roles. | Recreate the Process Integration Runtime service key with the roles listed in Step 8, update the variables, and restage. |
+
+### Appendix A — Equivalent CF CLI commands
+
 ```bash
 cf login -a https://api.cf.<region>.hana.ondemand.com
 cf target -o <org> -s <space>
 
-# Edit manifest.yml OR set secrets as environment variables:
 cf push --no-start
 
-cf set-env sap-cpi-mcp-server CPI_BASE_URL    "https://.../api/v1"
-cf set-env sap-cpi-mcp-server CPI_TOKEN_URL   "https://.../oauth/token"
-cf set-env sap-cpi-mcp-server CPI_CLIENT_ID   "..."
-cf set-env sap-cpi-mcp-server CPI_CLIENT_SECRET "..."
-cf set-env sap-cpi-mcp-server MCP_AUTH_TOKEN  "a-long-random-secret"   # optional gate
+cf set-env sap-cpi-mcp-server CPI_BASE_URL "https://<tenant>/api/v1"
+cf set-env sap-cpi-mcp-server CPI_TOKEN_URL "https://<subdomain>.authentication.<region>.hana.ondemand.com/oauth/token"
+cf set-env sap-cpi-mcp-server CPI_CLIENT_ID "<clientid>"
+cf set-env sap-cpi-mcp-server CPI_CLIENT_SECRET "<clientsecret>"
+cf set-env sap-cpi-mcp-server MCP_TRANSPORT "http"
+cf set-env sap-cpi-mcp-server ALLOW_WRITE "false"
+
+cf create-service xsuaa application sap-cpi-mcp-xsuaa -c xs-security.json
+cf bind-service sap-cpi-mcp-server sap-cpi-mcp-xsuaa
 
 cf start sap-cpi-mcp-server
+
+cf create-service-key sap-cpi-mcp-xsuaa sap-cpi-mcp-xsuaa-key
 ```
 
-The MCP endpoint will be:
-
-```
-https://sap-cpi-mcp-server.cfapps.<region>.hana.ondemand.com/mcp
-```
-
-Connect an HTTP-capable MCP client:
-
-```json
-{
-  "mcpServers": {
-    "sap-cpi": {
-      "type": "http",
-      "url": "https://sap-cpi-mcp-server.cfapps.<region>.hana.ondemand.com/mcp",
-      "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
-    }
-  }
-}
-```
-
-> **Security note:** `MCP_AUTH_TOKEN` is a simple shared-secret gate for getting started.
-> For production, front the app with the SAP **Application Router + XSUAA** for proper
-> OAuth2/JWT protection, and bind credentials via a service instance rather than plain env vars.
+> The service key from the last command supplies the `clientid`, `clientsecret` and `tokenurl`
+> to paste into Claude's custom connector — the same values Steps 12 and 18 retrieve through the
+> Cockpit UI. For a simpler dev-only setup without XSUAA, `MCP_AUTH_TOKEN` (a static shared
+> secret) still works as a fallback auth mode — see
+> [Securing the HTTP endpoint](#securing-the-http-endpoint-with-oauth-20-xsuaa) above.
 
 ---
 
