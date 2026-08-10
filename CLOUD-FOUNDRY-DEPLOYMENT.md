@@ -70,7 +70,6 @@ Open the GitHub repository and download the project as a ZIP archive.
 - Go to <https://github.com/premsaidaggolu/sap-cpi-mcp-server>.
 - Click **Code → Download ZIP**.
 
-![The sap-cpi-mcp-server GitHub repository, Code → Download ZIP.](docs/cloud-foundry-deployment/image1.png)
 
 *Figure 1 — The sap-cpi-mcp-server GitHub repository, Code → Download ZIP.*
 
@@ -85,7 +84,6 @@ it needs to be re-zipped.
    folder itself).
 3. Right-click → **Send to → Compressed (zipped) folder**, and name it `sap-cpi-mcp-server.zip`.
 
-![Selecting package.json, package-lock.json and src, then Send to → Compressed (zipped) folder.](docs/cloud-foundry-deployment/image2.png)
 
 *Figure 2 — Selecting package.json, package-lock.json and src, then Send to → Compressed (zipped)
 folder.*
@@ -103,12 +101,10 @@ folder.*
 In the BTP Cockpit, open your subaccount's Overview page. If Cloud Foundry hasn't been enabled
 yet, do so from here.
 
-![Subaccount Overview, with the Cloud Foundry Environment panel and Enable Cloud Foundry.](docs/cloud-foundry-deployment/image3.png)
 
 *Figure 3 — Subaccount Overview, with the Cloud Foundry Environment panel and Enable Cloud
 Foundry.*
 
-![Cloud Foundry Environment details: API endpoint, org name/ID, and the Spaces list.](docs/cloud-foundry-deployment/image4.png)
 
 *Figure 4 — Cloud Foundry Environment details: API endpoint, org name/ID, and the Spaces list.*
 
@@ -125,7 +121,6 @@ Click **Create Space** (top-right of the Spaces panel shown above) and name it �
 
 Open the `dev` space → **Applications** and click **Deploy Application**.
 
-![The Deploy Application dialog: File location, Deploy with (Manifest/Custom Settings), Manifest location.](docs/cloud-foundry-deployment/image5.png)
 
 *Figure 5 — The Deploy Application dialog: File location, Deploy with (Manifest/Custom
 Settings), Manifest location.*
@@ -135,7 +130,6 @@ Settings), Manifest location.*
 3. Browse to `manifest.yml` from the extracted folder for **Manifest location**.
 4. Keep **Start application after deploy** checked, then click **Deploy**.
 
-![Dialog filled in with sap-cpi-mcp-server.zip and manifest.yml, ready to deploy.](docs/cloud-foundry-deployment/image6.png)
 
 *Figure 6 — Dialog filled in with sap-cpi-mcp-server.zip and manifest.yml, ready to deploy.*
 
@@ -144,14 +138,12 @@ Settings), Manifest location.*
 Once deployment finishes, the application appears in the Applications list with a **Started**
 state.
 
-![Applications (1): sap-cpi-mcp-server, Requested State: Started.](docs/cloud-foundry-deployment/image7.png)
 
 *Figure 7 — Applications (1): sap-cpi-mcp-server, Requested State: Started.*
 
 Open it to see the Application Overview — buildpack, stack, and the Mapped Routes section with
 the public HTTPS URL Cloud Foundry assigned to the app.
 
-![Application Overview showing the nodejs_buildpack, cflinuxfs4 stack, and the Mapped Route.](docs/cloud-foundry-deployment/image8.png)
 
 *Figure 8 — Application Overview showing the nodejs_buildpack, cflinuxfs4 stack, and the Mapped
 Route.*
@@ -161,7 +153,6 @@ Route.*
 Open the Mapped Route link from Step 6 and append `/health` to it. A healthy deployment returns
 a small JSON payload confirming the server name, version, and an "ok" status.
 
-![GET /health returning status ok, server name and version.](docs/cloud-foundry-deployment/image9.png)
 
 *Figure 9 — GET /health returning `{ "status": "ok", "server": { "name": "sap-cpi-mcp-server",
 "version": "1.0.0" } }`.*
@@ -194,7 +185,6 @@ From the resulting service key JSON, you'll map:
 In the application, go to **User-Provided Variables** and click **Create Variable** for each of
 the following:
 
-![User-Provided Variables: ALLOW_WRITE, CPI_BASE_URL, CPI_CLIENT_ID, CPI_CLIENT_SECRET, CPI_TOKEN_URL, MCP_TRANSPORT.](docs/cloud-foundry-deployment/image10.png)
 
 *Figure 10 — User-Provided Variables: ALLOW_WRITE, CPI_BASE_URL, CPI_CLIENT_ID,
 CPI_CLIENT_SECRET, CPI_TOKEN_URL, MCP_TRANSPORT.*
@@ -212,11 +202,9 @@ CPI_CLIENT_SECRET, CPI_TOKEN_URL, MCP_TRANSPORT.*
 
 Environment variable changes only take effect after a restage.
 
-![Restage Application: "Restaging will cause application downtime."](docs/cloud-foundry-deployment/image11.png)
 
 *Figure 11 — Restage Application: "Restaging will cause application downtime."*
 
-![Application Overview after restage, confirming the app is Started and the route is live.](docs/cloud-foundry-deployment/image12.png)
 
 *Figure 12 — Application Overview after restage, confirming the app is Started and the route is
 live.*
@@ -233,7 +221,6 @@ In **Service Marketplace**, search for **Authorization and Trust Management Serv
 1. Plan: **application**, Runtime Environment: **Cloud Foundry**, Space: **dev**.
 2. Instance Name: `sap-cpi-mcp-server-xsuaa`.
 
-![New Instance or Subscription: Authorization and Trust Management Service, plan application.](docs/cloud-foundry-deployment/image13.png)
 
 *Figure 13 — New Instance or Subscription: Authorization and Trust Management Service, plan
 application.*
@@ -243,7 +230,6 @@ application.*
    `mcp.write`, `mcp.delete`, etc.).
 4. Click **Create**.
 
-![Parameters step with the xs-security.json scopes and descriptions pasted in.](docs/cloud-foundry-deployment/image14.png)
 
 *Figure 14 — Parameters step with the xs-security.json scopes and descriptions pasted in.*
 
@@ -252,7 +238,6 @@ application.*
 Open the new `sap-cpi-mcp-server-xsuaa` instance → **Service Keys → Create**. These credentials
 are what Claude will use to authenticate to the MCP endpoint.
 
-![New Service Key dialog for the XSUAA instance.](docs/cloud-foundry-deployment/image15.png)
 
 *Figure 15 — New Service Key dialog for the XSUAA instance.*
 
@@ -270,7 +255,6 @@ this panel handy for Part F.
 In the application, go to **Service Bindings → Bind Service Instance**, choose
 `sap-cpi-mcp-server-xsuaa`, and confirm the binding.
 
-![Bind Service Instance: selecting sap-cpi-mcp-server-xsuaa (service: xsuaa, plan: application).](docs/cloud-foundry-deployment/image17.png)
 
 *Figure 17 — Bind Service Instance: selecting sap-cpi-mcp-server-xsuaa (service: xsuaa, plan:
 application).*
@@ -283,11 +267,9 @@ application).*
 Under **Security → Role Collections**, create one collection per access level defined in
 `xs-security.json`'s role templates.
 
-![Create Role Collection: SapCpiMcp.Architect, mapped to the Architect role template.](docs/cloud-foundry-deployment/image18.png)
 
 *Figure 18 — Create Role Collection: SapCpiMcp.Architect, mapped to the Architect role template.*
 
-![Three role collections created: SapCpiMcp.Architect, .Developer and .Support.](docs/cloud-foundry-deployment/image19.png)
 
 *Figure 19 — Three role collections created: SapCpiMcp.Architect, .Developer and .Support.*
 
@@ -317,7 +299,6 @@ user.*
 
 In Claude, go to **Settings → Connectors → Add → Add custom connector**.
 
-![Add custom connector: Name, Remote MCP Server URL, and Advanced settings for OAuth Client ID/Secret.](docs/cloud-foundry-deployment/image21.png)
 
 *Figure 21 — Add custom connector: Name, Remote MCP Server URL, and Advanced settings for OAuth
 Client ID/Secret.*
@@ -327,7 +308,6 @@ Client ID/Secret.*
 Back in the Cockpit, open the application's Application Overview and copy the Mapped Routes URL,
 then append `/mcp` to it.
 
-![Application Overview with the Mapped Route to copy (append /mcp when pasting into Claude).](docs/cloud-foundry-deployment/image22.png)
 
 *Figure 22 — Application Overview with the Mapped Route to copy (append /mcp when pasting into
 Claude).*
@@ -350,7 +330,6 @@ Secret.*
 
 Click **Add**, then **Connect**.
 
-![Connector added, showing the /mcp URL and a Connect button before authentication.](docs/cloud-foundry-deployment/image24.png)
 
 *Figure 24 — Connector added, showing the /mcp URL and a Connect button before authentication.*
 
@@ -368,14 +347,12 @@ Confirm the end-to-end connection with two quick prompts in a new Claude chat:
 
 #### "List out the tools available in the SAP CPI MCP server."
 
-![Claude listing the full MCP tool catalog: discovery/catalog, packages & flows, deployment & runtime status, and more.](docs/cloud-foundry-deployment/image25.png)
 
 *Figure 25 — Claude listing the full MCP tool catalog: discovery/catalog, packages & flows,
 deployment & runtime status, and more.*
 
 #### "List out the deployed interfaces."
 
-![Claude calling list_deployed_artifacts and returning the tenant's actual deployed integration flow(s).](docs/cloud-foundry-deployment/image26.png)
 
 *Figure 26 — Claude calling list_deployed_artifacts and returning the tenant's actual deployed
 integration flow(s).*
