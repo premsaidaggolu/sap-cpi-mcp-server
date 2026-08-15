@@ -1,5 +1,10 @@
 # SAP CPI MCP Server
 
+> **⚠️ Archived — superseded by [sap-cpi-multi-tenant-mcp-server](https://github.com/premsaidaggolu/sap-cpi-multi-tenant-mcp-server).**
+> This repo was single-tenant only. All further development (multi-tenant support,
+> `build_integration_flow` flow authoring, and everything since) continues at the link
+> above. This repo is kept for history only and will not receive further updates.
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server that lets an MCP client
 (Claude Desktop, Claude Code, etc.) **monitor and manage SAP Cloud Integration (CPI / Integration
 Suite)** through its **OData v1 APIs** — the same surface documented as the "Cloud Integration"
